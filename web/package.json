@@ -1,0 +1,17 @@
+{
+  "name": "www.zamanbank.kz",
+  "version": "1.0.0",
+  "description": "",
+  "main": "gtm.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "compression": "^1.8.1",
+    "express": "^5.1.0"
+  }
+}
