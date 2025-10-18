@@ -7,7 +7,7 @@ import requests
 # FastAPI app setup for Banker NPC
 app = FastAPI(
     title="Banker Services Backend",
-    description="Backend for NPC Banker to suggest Sharia-compliant banking services based on full user data, supporting custom queries.",
+    description="Backend for NPC Banker to suggest Sharia-compliant banking services based on user data from a file, supporting custom queries.",
     version="1.0.0"
 )
 
@@ -15,6 +15,9 @@ app = FastAPI(
 BANK_API_KEY = "sk-roG3OusRr0TLCHAADks6lw"
 BANK_BASE_URL = "https://openai-hub.neuraldeep.tech"
 LLM_MODEL = "gpt-4o-mini"
+
+# Path to user data JSON file
+USER_DATA_PATH = os.path.join("backend", "user_full_banking_data.json")
 
 # Predefined bank products database
 BANK_PRODUCTS = [
@@ -76,7 +79,19 @@ BANK_PRODUCTS = [
     }
 ]
 
-# Helper function to call Bank's LLM API for service suggestions with full user data and optional query
+# Helper function to load user data from JSON file
+def load_user_data() -> Dict[str, Any]:
+    try:
+        if not os.path.exists(USER_DATA_PATH):
+            raise HTTPException(status_code=500, detail=f"User data file not found at {USER_DATA_PATH}")
+        with open(USER_DATA_PATH, 'r', encoding='utf-8') as file:
+            return json.load(file)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON in user data file: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading user data file: {str(e)}")
+
+# Helper function to call Bank's LLM API for service suggestions with user data and optional query
 def call_llm_api_for_services(user_data: Dict[str, Any], query: str = "") -> str:
     # Extract relevant fields from user_data
     goal = user_data.get("goal", {}).get("target_amount", 1000000)
@@ -98,7 +113,7 @@ def call_llm_api_for_services(user_data: Dict[str, Any], query: str = "") -> str
     if query:
         # Custom query prompt (suggest one product)
         prompt = (
-            "As a helpful banker specializing in Islamic finance, analyze the user's financial data as of October 18, 2025, 16:58 +05, focusing on the following query: '{query}'.\n"
+            "As a helpful banker specializing in Islamic finance, analyze the user's financial data as of October 19, 2025, 01:24 +05, focusing on the following query: '{query}'.\n"
             "Select **exactly one** Sharia-compliant banking service from the following list that best matches the user's needs based on their spending patterns, financial goal, savings, age, and income:\n"
             f"{json.dumps(eligible_products, indent=2, ensure_ascii=False)}\n\n"
             "Consider the following:\n"
@@ -113,11 +128,11 @@ def call_llm_api_for_services(user_data: Dict[str, Any], query: str = "") -> str
             "- Explain why this product is the best fit for the query and user's situation, referencing their data.\n"
             "- Calculate progress toward the goal (as a percentage) and any relevant affordability metrics.\n"
             "- End with a brief motivational message encouraging ethical financial behavior and Zakat."
-        )
+        ).format(query=query)
     else:
         # Default prompt (suggest 3-5 products)
         prompt = (
-            "As a helpful banker specializing in Islamic finance, analyze the user's transactions, financial goal, and savings as of October 18, 2025, 16:58 +05.\n"
+            "As a helpful banker specializing in Islamic finance, analyze the user's transactions, financial goal, and savings as of October 19, 2025, 01:24 +05.\n"
             "Suggest 3-5 Sharia-compliant banking services from the following list, tailoring recommendations to the user's spending patterns, goal, and savings:\n"
             f"{json.dumps(eligible_products, indent=2, ensure_ascii=False)}\n\n"
             "Consider the following:\n"
@@ -149,23 +164,22 @@ def call_llm_api_for_services(user_data: Dict[str, Any], query: str = "") -> str
     
     return response.json()["choices"][0]["message"]["content"]
 
-# API Endpoint for Banker suggestions, now supporting full user data and queries
+# API Endpoint for Banker suggestions, accepting only query
 @app.post("/suggest-services")
 async def suggest_services(request: Request):
     try:
         data = await request.json()
-        user_data = data.get("user_data", {})  # Full user JSON data
         query = data.get("query", "")  # Optional user text query
         
-        if not user_data:
-            raise HTTPException(status_code=400, detail="No user data provided.")
+        # Load user data from file
+        user_data = load_user_data()
         
         # Get LLM suggestions
         suggestions_text = call_llm_api_for_services(user_data, query)
         
-        # Response structure for WebGL game
+        # Response structure with only text field
         response = {
-            "suggestions": suggestions_text
+            "text": suggestions_text
         }
         
         return response
@@ -177,4 +191,4 @@ async def suggest_services(request: Request):
 # Run the app (for development, use uvicorn banker:app --reload)
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
