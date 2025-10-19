@@ -4,14 +4,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Request
 import requests
 
-
 router = APIRouter(prefix="/banker")
-# FastAPI app setup for Banker NPC
-# app = FastAPI(
-#     title="Banker Services Backend",
-#     description="Backend for NPC Banker to suggest Sharia-compliant banking services based on user data from a file, supporting custom queries.",
-#     version="1.0.0"
-# )
 
 # Bank API configuration
 BANK_API_KEY = "sk-roG3OusRr0TLCHAADks6lw"
@@ -19,7 +12,7 @@ BANK_BASE_URL = "https://openai-hub.neuraldeep.tech"
 LLM_MODEL = "gpt-4o-mini"
 
 # Path to user data JSON file
-USER_DATA_PATH = ("ZamanBankHack/backend/user_full_banking_data.json")
+USER_DATA_PATH = "as.json"
 
 # Predefined bank products database
 BANK_PRODUCTS = [
@@ -80,6 +73,76 @@ BANK_PRODUCTS = [
         "description": "Sharia-compliant investment product for higher returns, suitable for larger investments."
     }
 ]
+
+def load_user_data() -> Dict[str, Any]:
+    """Load user data from JSON file."""
+    if not os.path.exists(USER_DATA_PATH):
+        raise FileNotFoundError(f"User data file not found at {USER_DATA_PATH}")
+    with open(USER_DATA_PATH, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def generate_llm_prompt(user_query: str, user_data: Dict[str, Any], products: list) -> str:
+    """Generate a prompt for the LLM based on user query, data, and available products."""
+    products_str = json.dumps(products, ensure_ascii=False, indent=2)
+    user_data_str = json.dumps(user_data, ensure_ascii=False, indent=2)
+    
+    prompt = f"""
+    You are a helpful Sharia-compliant banker assistant. Your role is to answer customer questions about banking services, suggest suitable products based on the user's data, and provide accurate information.
+
+    User Data:
+    {user_data_str}
+
+    Available Products:
+    {products_str}
+
+    User Query: {user_query}
+
+    Respond in a friendly, professional manner. If the query is about products, suggest only those that match the user's age, needs, and financial situation from the available products. Explain why the product fits. If the query is general, provide informative answers. Always ensure responses are Sharia-compliant and ethical.
+
+    Response should be in Russian if the query is in Russian, otherwise in English.
+    """
+    return prompt
+
+def call_llm_api(prompt: str) -> str:
+    """Call the LLM API to get a response."""
+    headers = {
+        "Authorization": f"Bearer {BANK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 500,
+        "temperature": 0.7
+    }
+    response = requests.post(f"{BANK_BASE_URL}/v1/chat/completions", headers=headers, json=payload)
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="LLM API error")
+    
+    data = response.json()
+    return data['choices'][0]['message']['content'].strip()
+
+@router.post("/")
+async def handle_query(request: Request) -> Dict[str, str]:
+    """Endpoint to handle customer queries and respond using LLM."""
+    try:
+        body = await request.json()
+        user_query = body.get("text")
+        
+        if not user_query:
+            raise HTTPException(status_code=400, detail="Missing 'text' in request body")
+        
+        user_data = load_user_data()
+        prompt = generate_llm_prompt(user_query, user_data, BANK_PRODUCTS)
+        reply = call_llm_api(prompt)
+        
+        return {"reply": reply}
+    
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 # Helper function to load user data from JSON file
 def load_user_data() -> Dict[str, Any]:
@@ -157,7 +220,7 @@ def call_llm_api_for_services(user_data: Dict[str, Any], query: str = "") -> str
             {"role": "system", "content": "You are a knowledgeable banker focused on Islamic finance, providing personalized, Sharia-compliant service recommendations in a friendly manner."},
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 100,
+        "max_tokens": 1000,
         "temperature": 0.7
     }
     
