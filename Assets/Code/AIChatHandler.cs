@@ -1,39 +1,67 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 using TMPro;
 using UnityEngine.UI;
+using System.Collections;
+using Newtonsoft.Json;
 
 public class AIChatHandler : MonoBehaviour
 {
-    [Header("UI Elements")]
-    public TMP_InputField userInputField;
-    public TextMeshProUGUI chatOutputText;
-    public Button sendButton;
-
     [Header("Server Settings")]
-    public string backendUrl = "http://127.0.0.1:8000/analyze"; // поменяй, если используешь ngrok или Render
+    [SerializeField] private string backendUrl = "http://127.0.0.1:8000/chat"; // Эндпоинт FastAPI
+
+    [Header("UI Elements")]
+    [SerializeField] private TMP_InputField userInputField;
+    [SerializeField] private Button sendButton;
+    [SerializeField] private Messenger messenger; // Ссылка на Messenger
+
+    private GameObject thinkingMessage; // Хранит сообщение "ИИ думает..."
 
     private void Start()
     {
-        sendButton.onClick.AddListener(OnSendClicked);
+        if (userInputField == null)
+        {
+            Debug.LogError("userInputField is not assigned in AIChatHandler. Please assign in the Inspector.", this);
+        }
+        if (sendButton == null)
+        {
+            Debug.LogError("sendButton is not assigned in AIChatHandler. Please assign in the Inspector.", this);
+        }
+        if (messenger == null)
+        {
+            Debug.LogError("messenger is not assigned in AIChatHandler. Please assign in the Inspector.", this);
+        }
+
+        // Настраиваем кнопку отправки
+        if (sendButton != null)
+        {
+            sendButton.onClick.AddListener(OnSendClicked);
+        }
     }
 
-    private void OnSendClicked()
+    public void OnSendClicked()
     {
-        string userMessage = userInputField.text.Trim();
-        if (string.IsNullOrEmpty(userMessage))
+        if (userInputField == null || string.IsNullOrEmpty(userInputField.text.Trim()))
+        {
+            Debug.LogWarning("No input or userInputField is null, cannot send message");
             return;
+        }
 
-        AppendMessage($"<color=#00ff90><b>Вы:</b></color> {userMessage}");
+        string userMessage = userInputField.text.Trim();
+        // Добавляем сообщение игрока в Messenger
+        if (messenger != null)
+        {
+            messenger.AppendMessage($"<color=#00ff90><b>Вы:</b></color> {userMessage}", true);
+        }
         userInputField.text = "";
-        StartCoroutine(SendQueryToBackend(userMessage));
+
+        StartCoroutine(SendMessageToBackend(userMessage));
     }
 
-    private IEnumerator SendQueryToBackend(string message)
+    private IEnumerator SendMessageToBackend(string message)
     {
-        // Создаём JSON
-        string json = JsonUtility.ToJson(new QueryData(message));
+        var payload = new MessageData { text = message };
+        string json = JsonConvert.SerializeObject(payload);
         byte[] body = System.Text.Encoding.UTF8.GetBytes(json);
 
         using (UnityWebRequest req = new UnityWebRequest(backendUrl, "POST"))
@@ -42,44 +70,75 @@ public class AIChatHandler : MonoBehaviour
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
 
-            AppendMessage("<color=grey>ИИ думает...</color>");
+            if (messenger != null)
+            {
+                thinkingMessage = messenger.AppendMessage("<color=grey>ИИ думает...</color>", false);
+            }
             yield return req.SendWebRequest();
 
             if (req.result == UnityWebRequest.Result.Success)
             {
+                string rawResponse = req.downloadHandler.text;
+                Debug.Log("Ответ сервера: " + rawResponse);
+
                 try
                 {
-                    BackendResponse response = JsonUtility.FromJson<BackendResponse>(req.downloadHandler.text);
-                    AppendMessage($"<color=#ffcc00><b>ИИ:</b></color> {response.analysis}");
+                    ResponseData response = JsonConvert.DeserializeObject<ResponseData>(rawResponse);
+                    string reply = !string.IsNullOrEmpty(response.reply) ? response.reply : response.analysis;
+                    if (!string.IsNullOrEmpty(reply) && messenger != null && thinkingMessage != null)
+                    {
+                        messenger.ReplaceMessage(thinkingMessage, $"<color=#ffcc00><b>ИИ:</b></color> {reply}", false);
+                    }
+                    else if (messenger != null)
+                    {
+                        if (thinkingMessage != null)
+                        {
+                            messenger.ReplaceMessage(thinkingMessage, "<color=red>Ошибка: сервер вернул пустой ответ.</color>", false);
+                        }
+                        else
+                        {
+                            messenger.AppendMessage("<color=red>Ошибка: сервер вернул пустой ответ.</color>", false);
+                        }
+                    }
                 }
                 catch
                 {
-                    AppendMessage("<color=red>Ошибка чтения ответа.</color>");
+                    if (messenger != null && thinkingMessage != null)
+                    {
+                        messenger.ReplaceMessage(thinkingMessage, "<color=red>Ошибка: не удалось прочитать ответ сервера.</color>", false);
+                    }
+                    else if (messenger != null)
+                    {
+                        messenger.AppendMessage("<color=red>Ошибка: не удалось прочитать ответ сервера.</color>", false);
+                    }
                 }
             }
             else
             {
-                AppendMessage("<color=red>Ошибка подключения: " + req.error + "</color>");
+                if (messenger != null && thinkingMessage != null)
+                {
+                    messenger.ReplaceMessage(thinkingMessage, $"<color=red>Ошибка запроса ({req.responseCode}): {req.error}</color>", false);
+                }
+                else if (messenger != null)
+                {
+                    messenger.AppendMessage($"<color=red>Ошибка запроса ({req.responseCode}): {req.error}</color>", false);
+                }
             }
+
+            thinkingMessage = null; // Сбрасываем ссылку после обработки
         }
     }
 
-    private void AppendMessage(string msg)
+    [System.Serializable]
+    public class MessageData
     {
-        chatOutputText.text += "\n" + msg;
+        public string text;
     }
 
     [System.Serializable]
-    public class QueryData
+    public class ResponseData
     {
-        public string query;
-        public QueryData(string q) { query = q; }
-    }
-
-    [System.Serializable]
-    public class BackendResponse
-    {
-        public string analysis;
-        public string goal_progress;
+        public string reply;     // Основной ответ
+        public string analysis;  // Если сервер шлёт analysis
     }
 }

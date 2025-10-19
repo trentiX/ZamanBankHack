@@ -11,9 +11,9 @@ public class PlayerMovementController : MonoBehaviour
     [SerializeField] private Animator animator;
     
     [Header("Obstacle Detection")]
-    [SerializeField] private LayerMask obstacleLayer = -1; // Слой препятствий
-    [SerializeField] private float obstacleCheckDistance = 0.6f; // Дистанция проверки препятствий
-    [SerializeField] private float obstacleCheckRadius = 0.3f; // Радиус проверки (для SphereCast)
+    [SerializeField] private LayerMask obstacleLayer = -1;
+    [SerializeField] private float obstacleCheckDistance = 0.6f;
+    [SerializeField] private float obstacleCheckRadius = 0.3f;
 
     private IMovementInputProvider inputProvider;
     private StateMachine stateMachine;
@@ -25,6 +25,8 @@ public class PlayerMovementController : MonoBehaviour
     private ICharacterState walkState;
     private ICharacterState walkWithItemState;
 
+    private bool isInDialogue = false;
+
     private void Awake()
     {
         inputProvider = GetComponent<IMovementInputProvider>();
@@ -32,17 +34,30 @@ public class PlayerMovementController : MonoBehaviour
         playerInteractor = GetComponent<PlayerInteractor>();
 
         if (animator == null) animator = GetComponent<Animator>();
-        characterAnimator = new CharacterAnimator(animator);
+        if (inputProvider == null || stateMachine == null || playerInteractor == null)
+        {
+            Debug.LogError("Required components missing in PlayerMovementController", this);
+        }
 
+        characterAnimator = new CharacterAnimator(animator);
         idleState = new IdleState(characterAnimator);
         idleWithItemState = new IdleWithItemsState(characterAnimator);
         walkState = new WalkWithoutItemsState(characterAnimator);
         walkWithItemState = new WalkWithItemsState(characterAnimator);
     }
 
-    void Update()
+    private void Update()
     {
         if (inputProvider == null || stateMachine == null) return;
+
+        // Если в диалоге, принудительно устанавливаем состояние простоя и игнорируем ввод
+        if (isInDialogue)
+        {
+            ICharacterState targetState = playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState;
+            stateMachine.ChangeState(targetState);
+            Debug.Log($"In dialogue, state set to: {(playerInteractor.GetHasItemInHandsBool() ? "IdleWithItems" : "Idle")}");
+            return;
+        }
 
         Vector3 inputMoveDirection = inputProvider.GetMoveDirection();
         bool isMoving = inputMoveDirection.magnitude > 0.1f;
@@ -50,14 +65,17 @@ public class PlayerMovementController : MonoBehaviour
         if (isMoving)
         {
             stateMachine.ChangeState(playerInteractor.GetHasItemInHandsBool() ? walkWithItemState : walkState);
+            Debug.Log($"Moving, state set to: {(playerInteractor.GetHasItemInHandsBool() ? "WalkWithItems" : "Walk")}");
         }
         else if (playerInteractor.GetIsWorkingBool())
         {
-            return; // Do not change state if the player is working
+            Debug.Log("Player is working, no state change");
+            return;
         }
         else
         {
             stateMachine.ChangeState(playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState);
+            Debug.Log($"Not moving, state set to: {(playerInteractor.GetHasItemInHandsBool() ? "IdleWithItems" : "Idle")}");
         }
 
         TryMove(inputMoveDirection);
@@ -65,12 +83,19 @@ public class PlayerMovementController : MonoBehaviour
 
     private void TryMove(Vector3 inputMoveDirection)
     {
+        // Блокируем движение, если в диалоге
+        if (isInDialogue)
+        {
+            Debug.Log("Movement blocked: Player is in dialogue");
+            return;
+        }
+
         if (inputMoveDirection.sqrMagnitude > kMinInput)
         {
-            // Проверяем препятствия перед движением
             if (IsObstacleInFront(inputMoveDirection))
             {
-                return; // Не двигаемся, если впереди препятствие
+                Debug.Log("Movement blocked: Obstacle detected");
+                return;
             }
             
             Vector3 inputMoveDelta = inputMoveDirection * Time.deltaTime * speed;
@@ -83,6 +108,7 @@ public class PlayerMovementController : MonoBehaviour
                     transform.position = hit.position;
                     Quaternion targetRotation = Quaternion.LookRotation(inputMoveDirection);
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+                    Debug.Log("Player moved to: " + hit.position);
                 }
             }
         }
@@ -90,10 +116,8 @@ public class PlayerMovementController : MonoBehaviour
     
     private bool IsObstacleInFront(Vector3 moveDirection)
     {
-        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f; // Немного поднимаем луч
-        
-        // Используем SphereCast для более надежной проверки
-        return Physics.SphereCast(
+        Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
+        bool isObstacle = Physics.SphereCast(
             rayOrigin, 
             obstacleCheckRadius, 
             moveDirection, 
@@ -101,9 +125,28 @@ public class PlayerMovementController : MonoBehaviour
             obstacleCheckDistance, 
             obstacleLayer
         );
+        if (isObstacle)
+        {
+            Debug.Log("Obstacle detected in front: " + hit.collider.name);
+        }
+        return isObstacle;
+    }
+
+    public void EnterDialogue()
+    {
+        isInDialogue = true;
+        Debug.Log("Entered dialogue mode");
+        // Принудительно устанавливаем состояние простоя
+        stateMachine.ChangeState(playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState);
+    }
+
+    public void ExitDialogue()
+    {
+        isInDialogue = false;
+        Debug.Log("Exited dialogue mode");
+        // Состояние будет обновлено в Update
     }
     
-    // Для дебага - показывает область проверки препятствий
     private void OnDrawGizmosSelected()
     {
         if (inputProvider != null)
@@ -112,7 +155,6 @@ public class PlayerMovementController : MonoBehaviour
             if (moveDirection.magnitude > 0.1f)
             {
                 Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-                
                 Gizmos.color = IsObstacleInFront(moveDirection) ? Color.red : Color.green;
                 Gizmos.DrawWireSphere(rayOrigin + moveDirection * obstacleCheckDistance, obstacleCheckRadius);
                 Gizmos.DrawLine(rayOrigin, rayOrigin + moveDirection * obstacleCheckDistance);
