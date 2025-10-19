@@ -1,7 +1,4 @@
 
-<p align="center">
-  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg">
-</p>
 # ZamanBankHack Prototype Setup Instructions
 
 This document provides step-by-step instructions for the hackathon jury to set up and run our prototype locally. During the pitch, our team will handle all setup and demonstrations, but these steps allow you to test the project independently. The prototype consists of three main components: a web interface with a WebGL game, a backend server, and an AI assistant accessible via API endpoints exposed through ngrok.
@@ -105,3 +102,7 @@ Below is a list of all dependencies and libraries required to run the prototype:
 - For the pitch, our team will handle all setup and demonstrate the prototype seamlessly.
 
 Thank you for evaluating our project!
+
+<p align="center">
+  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg" style="height: 200px;">
+</p>
