@@ -105,5 +105,5 @@ Below is a list of all dependencies and libraries required to run the prototype:
 Thank you for evaluating our project!
 
 <p align="center">
-  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg" style="height: 600px;">
+  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg">
 </p>
