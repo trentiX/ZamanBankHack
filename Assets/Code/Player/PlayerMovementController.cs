@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
+using TMPro;
+using UnityEngine.EventSystems;
 
 public class PlayerMovementController : MonoBehaviour
 {
@@ -14,6 +16,9 @@ public class PlayerMovementController : MonoBehaviour
     [SerializeField] private LayerMask obstacleLayer = -1;
     [SerializeField] private float obstacleCheckDistance = 0.6f;
     [SerializeField] private float obstacleCheckRadius = 0.3f;
+
+    [Header("Input Field")]
+    [SerializeField] private TMP_InputField[] inputFields; // Массив полей ввода
 
     private IMovementInputProvider inputProvider;
     private StateMachine stateMachine;
@@ -44,13 +49,29 @@ public class PlayerMovementController : MonoBehaviour
         idleWithItemState = new IdleWithItemsState(characterAnimator);
         walkState = new WalkWithoutItemsState(characterAnimator);
         walkWithItemState = new WalkWithItemsState(characterAnimator);
+
+        // Проверка EventSystem
+        if (FindObjectOfType<EventSystem>() == null)
+        {
+            Debug.LogError("EventSystem отсутствует в сцене! Добавьте EventSystem для работы TMP_InputField.");
+        }
     }
 
     private void Update()
     {
         if (inputProvider == null || stateMachine == null) return;
 
-        // Если в диалоге, принудительно устанавливаем состояние простоя и игнорируем ввод
+        // Проверка активности поля ввода
+        bool isInputFieldActive = IsAnyInputFieldFocused();
+        if (isInputFieldActive)
+        {
+            ICharacterState targetState = playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState;
+            stateMachine.ChangeState(targetState);
+            Debug.Log($"Input field active, state set to: {(playerInteractor.GetHasItemInHandsBool() ? "IdleWithItems" : "Idle")}");
+            return;
+        }
+
+        // Если в диалоге
         if (isInDialogue)
         {
             ICharacterState targetState = playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState;
@@ -83,10 +104,10 @@ public class PlayerMovementController : MonoBehaviour
 
     private void TryMove(Vector3 inputMoveDirection)
     {
-        // Блокируем движение, если в диалоге
-        if (isInDialogue)
+        // Блокировка движения при активном поле ввода или диалоге
+        if (IsAnyInputFieldFocused() || isInDialogue)
         {
-            Debug.Log("Movement blocked: Player is in dialogue");
+            Debug.Log($"Movement blocked: {(IsAnyInputFieldFocused() ? "Input field active" : "In dialogue")}");
             return;
         }
 
@@ -113,7 +134,7 @@ public class PlayerMovementController : MonoBehaviour
             }
         }
     }
-    
+
     private bool IsObstacleInFront(Vector3 moveDirection)
     {
         Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
@@ -132,11 +153,38 @@ public class PlayerMovementController : MonoBehaviour
         return isObstacle;
     }
 
+    private bool IsAnyInputFieldFocused()
+    {
+        // Проверяем все TMP_InputField в сцене
+        foreach (var inputField in FindObjectsOfType<TMP_InputField>())
+        {
+            if (inputField != null && inputField.isFocused)
+            {
+                Debug.Log($"Input field {inputField.name} is focused");
+                return true;
+            }
+        }
+
+        // Проверяем указанные в инспекторе поля ввода
+        if (inputFields != null && inputFields.Length > 0)
+        {
+            foreach (var inputField in inputFields)
+            {
+                if (inputField != null && inputField.isFocused)
+                {
+                    Debug.Log($"Assigned input field {inputField.name} is focused");
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public void EnterDialogue()
     {
         isInDialogue = true;
         Debug.Log("Entered dialogue mode");
-        // Принудительно устанавливаем состояние простоя
         stateMachine.ChangeState(playerInteractor.GetHasItemInHandsBool() ? idleWithItemState : idleState);
     }
 
@@ -144,9 +192,8 @@ public class PlayerMovementController : MonoBehaviour
     {
         isInDialogue = false;
         Debug.Log("Exited dialogue mode");
-        // Состояние будет обновлено в Update
     }
-    
+
     private void OnDrawGizmosSelected()
     {
         if (inputProvider != null)
