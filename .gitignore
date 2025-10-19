@@ -71,3 +71,20 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+backend/npc_analystnpc.py
+backend/npc_banker.py
+backend/temp.py
+web/Build/read.txt
+web/business.html
+web/contacts.html
+web/documents.html
+web/faq.html
+web/gtm.js
+web/index.html
+web/news.html
+web/package-lock.json
+web/package.json
+web/readme.txt
+web/ru.html
+web/server.js
+backend/tempp1.py
