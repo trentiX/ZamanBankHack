@@ -99,11 +99,11 @@ Below is a list of all dependencies and libraries required to run the prototype:
 
 ## Notes
 - Ensure all terminals remain open while testing (one for ngrok, one for the Node.js server, and one for the Python backend).
-
-<p align="center">
-  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg" style="height: 600px;">
-</p>
 - If you encounter issues, verify that ports 8000 (backend) and 8001 (web) are not in use by other applications.
 - For the pitch, our team will handle all setup and demonstrate the prototype seamlessly.
 
 Thank you for evaluating our project!
+
+<p align="center">
+  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg" style="height: 600px;">
+</p>
