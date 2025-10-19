@@ -8,7 +8,7 @@ import requests
 router = APIRouter(prefix="/support")
 
 # Bank API configuration
-BANK_API_KEY = "sk-roG3OusRr0TLCHAADks6lw"
+BANK_API_KEY = "API-KEY"
 BANK_BASE_URL = "https://openai-hub.neuraldeep.tech"
 LLM_MODEL = "gpt-4o-mini"
 
@@ -143,3 +143,4 @@ Bank Products Database (JSON):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
