@@ -1,0 +1,12 @@
+/* Скрыть UI Unity WebGL (логотипы, кнопки, панель) */
+#unity-footer,
+.unity-footer,
+.unity-mobile-warning,
+#unity-loading-bar,
+#unity-progress-bar,
+.unity-logo,
+#unity-logo,
+.webgl-logo,
+.unity-icons {
+    display: none !important;
+}
