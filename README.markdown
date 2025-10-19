@@ -1,3 +1,19 @@
+<p align="center">
+      <img src="https://ibb.co.com/dwnNRHfH">
+</p>
+
+<p align="center">
+   <img alt="Static Badge" src="https://img.shields.io/badge/Views-729-009FB7">
+   <img alt="Static Badge" src="https://img.shields.io/badge/Downloads-279-7678ED">
+   <img src="https://img.shields.io/badge/Engine-Unity%202022.3.16f1-violet" alt="Unity Version">
+   <img src="https://img.shields.io/badge/Version-v1.3-698f3f" alt="Game Version">
+   <img src="https://img.shields.io/badge/License-MIT-f2542d" alt="License">
+   <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/trentiX/KTed">
+   <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/trentiX/KTed">
+</p>
+
+
+
 # ZamanBankHack Prototype Setup Instructions
 
 This document provides step-by-step instructions for the hackathon jury to set up and run our prototype locally. During the pitch, our team will handle all setup and demonstrations, but these steps allow you to test the project independently. The prototype consists of three main components: a web interface with a WebGL game, a backend server, and an AI assistant accessible via API endpoints exposed through ngrok.
