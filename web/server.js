@@ -4,7 +4,7 @@ const compression = require("compression");
 const fs = require("fs");
 
 const app = express();
-const PORT = 8000;
+const PORT = 8001;
 
 // Включаем gzip/brotli поддержку
 app.use(compression());
@@ -28,3 +28,4 @@ app.use(express.static(path.join(__dirname)));
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен: http://localhost:${PORT}`);
 });
+
