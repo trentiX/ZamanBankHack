@@ -8,7 +8,7 @@ import requests
 router = APIRouter(prefix="/analyst")
 
 # Bank API configuration (using the same as Banker for consistency)
-BANK_API_KEY = "sk-roG3OusRr0TLCHAADks6lw"
+BANK_API_KEY = "API-KEY"
 BANK_BASE_URL = "https://openai-hub.neuraldeep.tech"
 LLM_MODEL = "gpt-4o-mini"
 
@@ -103,3 +103,4 @@ User Query: {user_query}
 # if __name__ == "main":
 #     import uvicorn
 #     uvicorn.run(app, host="0.0.0.0", port=8000)  # Different port to avoid conflict with Banker
+
