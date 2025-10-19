@@ -6,12 +6,6 @@ import requests
 
 
 router = APIRouter(prefix="/support")
-# FastAPI app setup for General Islamic Banking Q&A Agent
-# app = FastAPI(
-#     title="Islamic Banking Q&A Agent",
-#     description="Backend for an NPC Banker to answer general questions about Islamic banking and bank services in a Sharia-compliant manner.",
-#     version="1.0.0"
-# )
 
 # Bank API configuration
 BANK_API_KEY = "sk-roG3OusRr0TLCHAADks6lw"
@@ -78,71 +72,74 @@ BANK_PRODUCTS = [
     }
 ]
 
-# Helper function to call Bank's LLM API for general Islamic banking questions
-def call_llm_api_for_qa(query: str) -> str:
-    prompt = (
-        "Ты эксперт по исламскому банкингу, работающий в банке, который предлагает продукты, соответствующие принципам шариата. "
-        "Дата и время: 19 октября 2025, 04:44 +05. Отвечай на русском языке на вопрос пользователя: '{query}'.\n\n"
-        "Учитывай следующее:\n"
-        "- Объясняй принципы исламского банкинга (запрет риба, этичные инвестиции, поддержка закята) при необходимости.\n"
-        "- Если вопрос касается продуктов банка, ссылайся на следующий список:\n"
-        f"{json.dumps(BANK_PRODUCTS, indent=2, ensure_ascii=False)}\n"
-        "- Отвечай кратко, структурированно, не более 150 слов.\n"
-        "- Если вопрос неясен, дай общий ответ о преимуществах исламского банкинга.\n"
-        "- Завершай ответ мотивацией к этичному финансовому поведению.\n\n"
-        "Формат ответа:\n"
-        "- Основной ответ на вопрос.\n"
-        "- Краткое упоминание, как это связано с шариатом (если применимо).\n"
-        "- Мотивация к ответственному финансовому поведению."
-    ).format(query=query)
-
-    headers = {
-        "Authorization": f"Bearer {BANK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": "Ты эксперт по исламскому банкингу, предоставляющий точные и лаконичные ответы на русском языке."},
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 150,
-        "temperature": 0.7
-    }
-
-    try:
-        response = requests.post(f"{BANK_BASE_URL}/v1/chat/completions", headers=headers, json=payload)
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Ошибка вызова LLM API: {response.text}")
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки запроса: {str(e)}")
-
-# API Endpoint for general Islamic banking questions
 @router.post("/ask-banker")
-async def ask_banker(request: Request):
+async def handle_support_query(request: Request) -> Dict[str, Any]:
+    """
+    Endpoint to handle general questions about Islamic banking, terms, products, and services.
+    Uses LLM to generate Sharia-compliant responses based on predefined bank products.
+    """
     try:
+        # Parse incoming request
         data = await request.json()
-        query = data.get("query", "")  # User question about Islamic banking or bank services
-        
-        if not query:
-            raise HTTPException(status_code=400, detail="Не предоставлен запрос (query).")
+        user_query = data.get("text", "").strip()
+        if not user_query:
+            raise HTTPException(status_code=400, detail="No query provided in 'text' field.")
 
-        # Get LLM response
-        answer = call_llm_api_for_qa(query)
+        # Prepare the prompt for the LLM
+        system_prompt = """
+You are a helpful support agent NPC for an Islamic bank. Answer user questions about Islamic banking principles, terms, products, services, and related topics in a Sharia-compliant, friendly, and informative manner.
+Provide accurate information based on Islamic finance rules (e.g., no riba/interest, focus on profit-sharing, asset-backed transactions).
+If the question relates to bank products, use the following predefined products database for reference.
+Always respond concisely, clearly, and politely.
 
-        # Response structure
-        response = {
-            "reply": answer
+Bank Products Database (JSON):
+{products_json}
+""".format(products_json=json.dumps(BANK_PRODUCTS, indent=2, ensure_ascii=False))
+
+        user_prompt = f"User Question: {user_query}"
+
+        # Prepare headers and payload for the LLM API
+        headers = {
+            "Authorization": f"Bearer {BANK_API_KEY}",
+            "Content-Type": "application/json"
         }
 
-        return response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Неверный формат запроса: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+        payload = {
+            "model": LLM_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1000
+        }
 
-# # Run the app (for development, use uvicorn banker:app --reload)
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+        # Send request to the LLM API
+        llm_response = requests.post(
+            f"{BANK_BASE_URL}/v1/chat/completions",
+            headers=headers,
+            json=payload
+        )
+
+        if llm_response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM API error: {llm_response.status_code} - {llm_response.text}"
+            )
+
+        # Parse LLM response
+        result = llm_response.json()
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+        if not reply:
+            raise HTTPException(status_code=500, detail="Empty response from LLM.")
+
+        # Return the reply in the expected format
+        return {"reply": reply}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
