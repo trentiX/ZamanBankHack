@@ -1,5 +1,5 @@
 <p align="center">
-      <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg">
+  <img src="https://i.ibb.co.com/7d73q0S0/photo-2025-10-19-06-11-47.jpg" style="height: 200px;">
 </p>
 
 # ZamanBankHack Prototype Setup Instructions
